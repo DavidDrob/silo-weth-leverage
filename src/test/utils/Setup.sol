@@ -148,5 +148,6 @@ contract Setup is ExtendedTest, IEvents {
 
     function _setTokenAddrs() internal {
         tokenAddrs["WETH"] = 0x4200000000000000000000000000000000000006;
+        tokenAddrs["EZ_ETH"] = 0x2416092f143378750bb29b79eD961ab195CcEea5;
     }
 }

@@ -19,6 +19,17 @@ contract OperationTest is Setup {
         // TODO: add additional check on strat params
     }
 
+    function test_deposit(uint256 _amount) public {
+        _amount = 200e18;
+        vm.assume(_amount > minFuzzAmount && _amount < maxFuzzAmount);
+
+        // Deposit into strategy
+        mintAndDepositIntoStrategy(strategy, user, _amount);
+
+        assertEq(strategy.totalAssets(), _amount, "!totalAssets");
+        assertGt(ERC20(tokenAddrs["EZ_ETH"]).balanceOf(address(strategy)), 0);
+    }
+
     function test_operation(uint256 _amount) public {
         vm.assume(_amount > minFuzzAmount && _amount < maxFuzzAmount);
 
@@ -45,6 +56,9 @@ contract OperationTest is Setup {
         // Withdraw all funds
         vm.prank(user);
         strategy.redeem(_amount, user, user);
+
+
+        airdrop(asset, address(strategy), 200e18);
 
         assertGe(
             asset.balanceOf(user),

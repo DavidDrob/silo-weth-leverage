@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity ^0.8.18;
 
+import "forge-std/console2.sol";
+
 import {BaseStrategy, ERC20} from "@tokenized-strategy/BaseStrategy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-// Import interfaces for many popular DeFi projects, or add your own!
-//import "../interfaces/<protocol>/<Interface>.sol";
+// import {ISilo} from "@silo/interfaces/ISilo.sol";
+import {ISilo} from "./interfaces/ISilo.sol";
+import {ISiloRepository} from "./interfaces/ISiloRepository.sol";
 
 /**
  * The `TokenizedStrategy` variable can be used to retrieve the strategies
@@ -23,10 +27,20 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract Strategy is BaseStrategy {
     using SafeERC20 for ERC20;
 
+    // tokens
+    IERC20 public constant WETH = IERC20(0x4200000000000000000000000000000000000006);
+    IERC20 public constant EZ_ETH = IERC20(0x2416092f143378750bb29b79eD961ab195CcEea5);
+
+    // protocols
+    ISilo public constant SILO = ISilo(0x12ee4BE944b993C81b6840e088bA1dCc57F07B1D);
+    ISiloRepository public constant SILO_REPOSITORY = ISiloRepository(0xD2767dAdED5910bbc205811FdbD2eEFd460AcBe9);
+
     constructor(
         address _asset,
         string memory _name
-    ) BaseStrategy(_asset, _name) {}
+    ) BaseStrategy(_asset, _name) {
+        WETH.approve(address(SILO), type(uint256).max);
+    }
 
     /*//////////////////////////////////////////////////////////////
                 NEEDED TO BE OVERRIDDEN BY STRATEGIST
@@ -44,9 +58,15 @@ contract Strategy is BaseStrategy {
      * to deposit in the yield source.
      */
     function _deployFunds(uint256 _amount) internal override {
-        // TODO: implement deposit logic EX:
-        //
-        //      lendingPool.deposit(address(asset), _amount ,0);
+        // add collateral
+        SILO.deposit(address(WETH), _amount, false);
+
+        // wETH and ezETH are almost 1:1
+        // 20% extra for safety
+        uint256 _max_ltv = SILO_REPOSITORY.getMaximumLTV(address(SILO), address(EZ_ETH));
+        uint256 _borrow_amount = ((_max_ltv - 0.20e18) * _amount) / 1e18;
+
+        SILO.borrow(address(EZ_ETH), _borrow_amount);
     }
 
     /**
@@ -71,9 +91,7 @@ contract Strategy is BaseStrategy {
      * @param _amount, The amount of 'asset' to be freed.
      */
     function _freeFunds(uint256 _amount) internal override {
-        // TODO: implement withdraw logic EX:
-        //
-        //      lendingPool.withdraw(address(asset), _amount);
+        // SILO.withdraw(address(WETH), _amount, true);
     }
 
     /**
@@ -147,7 +165,7 @@ contract Strategy is BaseStrategy {
         // if(yieldSource.notShutdown()) {
         //    return asset.balanceOf(address(this)) + asset.balanceOf(yieldSource);
         // }
-        return asset.balanceOf(address(this));
+        return type(uint256).max;
     }
 
     /**
@@ -174,11 +192,7 @@ contract Strategy is BaseStrategy {
     function availableDepositLimit(
         address _owner
     ) public view override returns (uint256) {
-        TODO: If desired Implement deposit limit logic and any needed state variables .
-        
-        EX:    
-            uint256 totalAssets = TokenizedStrategy.totalAssets();
-            return totalAssets >= depositLimit ? 0 : depositLimit - totalAssets;
+        return type(uint256).max;
     }
     */
 

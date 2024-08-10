@@ -7,6 +7,8 @@ import {BaseStrategy, ERC20} from "@tokenized-strategy/BaseStrategy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IMockSwap} from "./interfaces/mock/IMockSwap.sol";
+
 // import {ISilo} from "@silo/interfaces/ISilo.sol";
 import {ISilo} from "./interfaces/ISilo.sol";
 import {ISiloRepository} from "./interfaces/ISiloRepository.sol";
@@ -28,18 +30,28 @@ contract Strategy is BaseStrategy {
     using SafeERC20 for ERC20;
 
     // tokens
-    IERC20 public constant WETH = IERC20(0x4200000000000000000000000000000000000006);
-    IERC20 public constant EZ_ETH = IERC20(0x2416092f143378750bb29b79eD961ab195CcEea5);
+    address public constant WETH = 0x4200000000000000000000000000000000000006;
+    address public constant EZ_ETH = 0x2416092f143378750bb29b79eD961ab195CcEea5;
 
     // protocols
     ISilo public constant SILO = ISilo(0x12ee4BE944b993C81b6840e088bA1dCc57F07B1D);
     ISiloRepository public constant SILO_REPOSITORY = ISiloRepository(0xD2767dAdED5910bbc205811FdbD2eEFd460AcBe9);
+    IMockSwap public mockSwap;
 
     constructor(
         address _asset,
         string memory _name
     ) BaseStrategy(_asset, _name) {
-        WETH.approve(address(SILO), type(uint256).max);
+        IERC20(WETH).approve(address(SILO), type(uint256).max);
+    }
+
+    function updateMockSwap(address newMockSwap) public onlyManagement {
+        if (IERC20(EZ_ETH).allowance(address(this), address(mockSwap)) > 0) {
+            IERC20(EZ_ETH).approve(address(mockSwap), 0);
+        }
+        IERC20(EZ_ETH).approve(newMockSwap, type(uint256).max);
+
+        mockSwap = IMockSwap(newMockSwap);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -59,14 +71,14 @@ contract Strategy is BaseStrategy {
      */
     function _deployFunds(uint256 _amount) internal override {
         // add collateral
-        SILO.deposit(address(WETH), _amount, false);
+        SILO.deposit(WETH, _amount, false);
 
         // wETH and ezETH are almost 1:1
         // 20% extra for safety
-        uint256 _max_ltv = SILO_REPOSITORY.getMaximumLTV(address(SILO), address(EZ_ETH));
+        uint256 _max_ltv = SILO_REPOSITORY.getMaximumLTV(address(SILO), EZ_ETH);
         uint256 _borrow_amount = ((_max_ltv - 0.20e18) * _amount) / 1e18;
 
-        SILO.borrow(address(EZ_ETH), _borrow_amount);
+        SILO.borrow(EZ_ETH, _borrow_amount);
     }
 
     /**
@@ -128,6 +140,9 @@ contract Strategy is BaseStrategy {
         //      }
         //      _totalAssets = aToken.balanceOf(address(this)) + asset.balanceOf(address(this));
         //
+        uint256 bal = IERC20(EZ_ETH).balanceOf(address(this));
+        mockSwap.swap_ezeth_for_weth(bal);
+
         _totalAssets = asset.balanceOf(address(this));
     }
 
@@ -194,7 +209,6 @@ contract Strategy is BaseStrategy {
     ) public view override returns (uint256) {
         return type(uint256).max;
     }
-    */
 
     /**
      * @dev Optional function for strategist to override that can

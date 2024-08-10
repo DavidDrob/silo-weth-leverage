@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 import "forge-std/console2.sol";
 import {ExtendedTest} from "./ExtendedTest.sol";
 
+import {MockSwap} from "../../MockSwap.sol";
 import {Strategy, ERC20} from "../../Strategy.sol";
 import {IStrategyInterface} from "../../interfaces/IStrategyInterface.sol";
 
@@ -38,9 +39,10 @@ contract Setup is ExtendedTest, IEvents {
     uint256 public decimals;
     uint256 public MAX_BPS = 10_000;
 
-    // Fuzz from $0.01 of 1e6 stable coins up to 1 trillion of a 1e18 coin
-    uint256 public maxFuzzAmount = 1e30;
-    uint256 public minFuzzAmount = 10_000;
+    // Fuzz from 0.01 of 1e18 token up to
+    // two tousand (available borrow amount) a 1e18 token
+    uint256 public maxFuzzAmount = 2_000e18;
+    uint256 public minFuzzAmount = 0.01e18;
 
     // Default profit max unlock time is set for 10 days
     uint256 public profitMaxUnlockTime = 10 days;
@@ -58,6 +60,16 @@ contract Setup is ExtendedTest, IEvents {
         strategy = IStrategyInterface(setUpStrategy());
 
         factory = strategy.FACTORY();
+
+        // Deploy mock swap contract and airdrop it tokens
+        address mockSwap = address(new MockSwap());
+
+        vm.prank(management);
+        strategy.updateMockSwap(mockSwap);
+
+        airdrop(ERC20(tokenAddrs["EZ_ETH"]), mockSwap, 1_000e18);
+        airdrop(ERC20(tokenAddrs["WETH"]), mockSwap, 1_000e18);
+
 
         // label all the used addresses for traces
         vm.label(keeper, "keeper");

@@ -2,6 +2,10 @@
 pragma solidity ^0.8.18;
 
 interface ISilo {
+    function getAssets() external view returns (address[] memory assets);
+    function depositPossible(address _asset, address _depositor) external view returns (bool);
+    function borrowPossible(address _asset, address _borrower) external view returns (bool);
+
     /// @notice Deposit `_amount` of `_asset` tokens from `msg.sender` to the Silo
     /// @param _asset The address of the token to deposit
     /// @param _amount The amount of the token to deposit

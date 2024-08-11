@@ -67,8 +67,8 @@ contract Setup is ExtendedTest, IEvents {
         vm.prank(management);
         strategy.updateMockSwap(mockSwap);
 
-        airdrop(ERC20(tokenAddrs["EZ_ETH"]), mockSwap, 1_000e18);
-        airdrop(ERC20(tokenAddrs["WETH"]), mockSwap, 1_000e18);
+        airdrop(ERC20(tokenAddrs["EZ_ETH"]), mockSwap, 10_000e18);
+        airdrop(ERC20(tokenAddrs["WETH"]), mockSwap, 10_000e18);
 
 
         // label all the used addresses for traces
@@ -161,5 +161,6 @@ contract Setup is ExtendedTest, IEvents {
     function _setTokenAddrs() internal {
         tokenAddrs["WETH"] = 0x4200000000000000000000000000000000000006;
         tokenAddrs["EZ_ETH"] = 0x2416092f143378750bb29b79eD961ab195CcEea5;
+        tokenAddrs["spEZ_ETH"] = 0xEEf2282949f4a1545AAB9824A88bA35A3fE2D990;
     }
 }

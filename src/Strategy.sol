@@ -43,13 +43,21 @@ contract Strategy is BaseStrategy {
         string memory _name
     ) BaseStrategy(_asset, _name) {
         IERC20(WETH).approve(address(SILO), type(uint256).max);
+        IERC20(EZ_ETH).approve(address(SILO), type(uint256).max);
     }
 
     function updateMockSwap(address newMockSwap) public onlyManagement {
+        // approve ezETH
         if (IERC20(EZ_ETH).allowance(address(this), address(mockSwap)) > 0) {
             IERC20(EZ_ETH).approve(address(mockSwap), 0);
         }
         IERC20(EZ_ETH).approve(newMockSwap, type(uint256).max);
+
+        // approve wETH
+        if (IERC20(WETH).allowance(address(this), address(mockSwap)) > 0) {
+            IERC20(WETH).approve(address(mockSwap), 0);
+        }
+        IERC20(WETH).approve(newMockSwap, type(uint256).max);
 
         mockSwap = IMockSwap(newMockSwap);
     }
@@ -70,15 +78,25 @@ contract Strategy is BaseStrategy {
      * to deposit in the yield source.
      */
     function _deployFunds(uint256 _amount) internal override {
-        // add collateral
-        SILO.deposit(WETH, _amount, false);
+        uint256 _lastOut = mockSwap.swap_weth_for_ezeth(_amount);
 
-        // wETH and ezETH are almost 1:1
-        // 20% extra for safety
-        uint256 _max_ltv = SILO_REPOSITORY.getMaximumLTV(address(SILO), EZ_ETH);
-        uint256 _borrow_amount = ((_max_ltv - 0.20e18) * _amount) / 1e18;
+        if (SILO.depositPossible(EZ_ETH, address(this))) {
+            // 3x leverage
+            for (uint i = 0; i < 3; i++) {
+                SILO.deposit(EZ_ETH, _lastOut, true);
 
-        SILO.borrow(EZ_ETH, _borrow_amount);
+                // wETH and ezETH are almost 1:1
+                // 20% extra for extra safety
+                uint256 _max_ltv = SILO_REPOSITORY.getMaximumLTV(address(SILO), WETH);
+                uint256 _borrow_amount = ((_max_ltv - 0.20e18) * _amount) / 1e18;
+
+                (uint _wETHOut,) = SILO.borrow(WETH, _borrow_amount);
+
+                _lastOut = mockSwap.swap_weth_for_ezeth(_wETHOut);
+            }
+
+            SILO.deposit(EZ_ETH, _lastOut, true);
+        }
     }
 
     /**
@@ -133,15 +151,13 @@ contract Strategy is BaseStrategy {
         override
         returns (uint256 _totalAssets)
     {
-        // TODO: Implement harvesting logic and accurate accounting EX:
-        //
-        //      if(!TokenizedStrategy.isShutdown()) {
-        //          _claimAndSellRewards();
-        //      }
-        //      _totalAssets = aToken.balanceOf(address(this)) + asset.balanceOf(address(this));
-        //
-        uint256 bal = IERC20(EZ_ETH).balanceOf(address(this));
-        mockSwap.swap_ezeth_for_weth(bal);
+        console2.log(IERC20(0xEEf2282949f4a1545AAB9824A88bA35A3fE2D990).balanceOf(address(this)));
+
+        console2.log("HARVEST");
+        uint256[] memory feesHarvested = SILO.harvestProtocolFees();
+        for (uint i = 0; i < feesHarvested.length; i++) {
+            console2.log(feesHarvested[i]);
+        }
 
         _totalAssets = asset.balanceOf(address(this));
     }
